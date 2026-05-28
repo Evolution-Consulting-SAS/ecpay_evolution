@@ -1,4 +1,4 @@
-package com.ecpay.evolution.domain;
+package com.ecpay.evolution;
 
 public class CsvProcessingException extends RuntimeException {
 

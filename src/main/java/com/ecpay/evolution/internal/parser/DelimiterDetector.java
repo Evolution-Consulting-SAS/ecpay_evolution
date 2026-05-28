@@ -1,4 +1,4 @@
-package com.ecpay.evolution.adapter.parser;
+package com.ecpay.evolution.internal.parser;
 
 class DelimiterDetector {
 

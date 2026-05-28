@@ -1,8 +1,7 @@
-package com.ecpay.evolution.adapter.parser;
+package com.ecpay.evolution.internal.parser;
 
-import com.ecpay.evolution.domain.ErrorCode;
-import com.ecpay.evolution.domain.CsvProcessingException;
-import com.ecpay.evolution.domain.port.out.CsvParserPort;
+import com.ecpay.evolution.ErrorCode;
+import com.ecpay.evolution.CsvProcessingException;
 import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 
@@ -10,7 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CsvParser implements CsvParserPort {
+public class CsvParser {
 
     public List<List<String>> parse(String csvText) {
         String[] lines = splitIntoLines(csvText);

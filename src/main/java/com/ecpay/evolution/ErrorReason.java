@@ -1,6 +1,5 @@
-package com.ecpay.evolution.adapter;
+package com.ecpay.evolution;
 
-import com.ecpay.evolution.domain.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 import java.util.Arrays;

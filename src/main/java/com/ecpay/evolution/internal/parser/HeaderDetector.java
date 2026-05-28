@@ -1,11 +1,9 @@
-package com.ecpay.evolution.adapter.parser;
+package com.ecpay.evolution.internal.parser;
 
 import java.util.Arrays;
 
 class HeaderDetector {
 
-    // Una fila es header si NINGUNA de sus celdas parece un dato real
-    // (ninguna es número entero, decimal o fecha).
     static boolean isHeader(String[] cells) {
         return Arrays.stream(cells)
                 .map(String::trim)

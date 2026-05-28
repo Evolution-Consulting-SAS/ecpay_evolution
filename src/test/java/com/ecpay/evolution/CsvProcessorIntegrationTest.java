@@ -1,12 +1,8 @@
 package com.ecpay.evolution;
 
-import com.ecpay.evolution.adapter.Base64CsvDecoder;
-import com.ecpay.evolution.adapter.CsvReflectionMapper;
-import com.ecpay.evolution.adapter.parser.CsvParser;
-import com.ecpay.evolution.application.CsvProcessorService;
-import com.ecpay.evolution.domain.ErrorCode;
-import com.ecpay.evolution.domain.CsvProcessingException;
-import com.ecpay.evolution.domain.port.in.CsvProcessorPort;
+import com.ecpay.evolution.CsvProcessor;
+import com.ecpay.evolution.CsvProcessingException;
+import com.ecpay.evolution.ErrorCode;
 import com.ecpay.evolution.fixture.HistoricalContributorRow;
 import com.ecpay.evolution.fixture.HistoricalOrgRow;
 import com.ecpay.evolution.fixture.HistoricalSalaryRow;
@@ -21,11 +17,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CsvProcessorIntegrationTest {
 
-    private final CsvProcessorPort processor = new CsvProcessorService(
-            new Base64CsvDecoder(),
-            new CsvParser(),
-            new CsvReflectionMapper()
-    );
 
     private static String toBase64(String csv) {
         return Base64.getEncoder().encodeToString(csv.getBytes(StandardCharsets.UTF_8));
@@ -45,7 +36,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processSalary_mapsFull11Columns");
         System.out.println("[INPUT] CSV:\n" + csv);
 
-        List<HistoricalSalaryRow> result = processor.process(toBase64(csv), HistoricalSalaryRow.class);
+        List<HistoricalSalaryRow> result = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class);
         HistoricalSalaryRow row = result.get(0);
 
         System.out.println("[OUTPUT] companyId=" + row.getCompanyId()
@@ -84,7 +75,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processSalary_mapsMultipleRows");
         System.out.println("[INPUT] CSV con 3 filas de salario");
 
-        List<HistoricalSalaryRow> result = processor.process(toBase64(csv), HistoricalSalaryRow.class);
+        List<HistoricalSalaryRow> result = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class);
 
         System.out.println("[OUTPUT] Total filas mapeadas: " + result.size());
         for (int i = 0; i < result.size(); i++) {
@@ -117,7 +108,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processContributor_mapsBooleans");
         System.out.println("[INPUT] healthAssistance=si | pensionAssistance=no | pensionForeigner=1");
 
-        List<HistoricalContributorRow> result = processor.process(toBase64(csv), HistoricalContributorRow.class);
+        List<HistoricalContributorRow> result = CsvProcessor.process(toBase64(csv), HistoricalContributorRow.class);
         HistoricalContributorRow row = result.get(0);
 
         System.out.println("[OUTPUT] healthAssistance=" + row.getHealthAssistance()
@@ -141,7 +132,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processContributor_mapsDoubles");
         System.out.println("[INPUT] healthPercentage=12.5 | pensionPercentage=16.0 | solidarityPercentage=2.0");
 
-        List<HistoricalContributorRow> result = processor.process(toBase64(csv), HistoricalContributorRow.class);
+        List<HistoricalContributorRow> result = CsvProcessor.process(toBase64(csv), HistoricalContributorRow.class);
         HistoricalContributorRow row = result.get(0);
 
         System.out.println("[OUTPUT] healthPercentage=" + row.getHealthPercentage()
@@ -169,7 +160,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processOrg_withSemicolonDelimiter");
         System.out.println("[INPUT] CSV con delimitador ';' (estilo europeo)");
 
-        List<HistoricalOrgRow> result = processor.process(toBase64(csv), HistoricalOrgRow.class);
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
         HistoricalOrgRow row = result.get(0);
 
         System.out.println("[OUTPUT] companyId=" + row.getCompanyId()
@@ -196,7 +187,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processOrg_headerDetectedAndSkipped");
         System.out.println("[INPUT] Header con nombres en mayúsculas — la librería lo detecta y salta, luego mapea por posición");
 
-        List<HistoricalOrgRow> result = processor.process(toBase64(csv), HistoricalOrgRow.class);
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
 
         System.out.println("[OUTPUT] companyId=" + result.get(0).getCompanyId()
                 + " | positionId=" + result.get(0).getPositionId());
@@ -216,7 +207,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] processOrg_withoutHeader_mapsDirectly");
         System.out.println("[INPUT] CSV sin header — primera línea ya son datos");
 
-        List<HistoricalOrgRow> result = processor.process(toBase64(csv), HistoricalOrgRow.class);
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
 
         System.out.println("[OUTPUT] Total filas: " + result.size());
         for (int i = 0; i < result.size(); i++) {
@@ -245,7 +236,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] process_csvWithExcelBom_stillWorks");
         System.out.println("[INPUT] CSV con BOM de Excel (U+FEFF) al inicio");
 
-        List<HistoricalOrgRow> result = processor.process(base64, HistoricalOrgRow.class);
+        List<HistoricalOrgRow> result = CsvProcessor.process(base64, HistoricalOrgRow.class);
 
         System.out.println("[OUTPUT] companyId=" + result.get(0).getCompanyId()
                 + " (BOM eliminado correctamente — no aparece como parte del campo)");
@@ -267,7 +258,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] process_emptyCsv_throwsCsvEmptyFile");
         System.out.println("[INPUT] Base64 de un string vacío '   '");
 
-        assertThatThrownBy(() -> processor.process(base64Vacio, HistoricalOrgRow.class))
+        assertThatThrownBy(() -> CsvProcessor.process(base64Vacio, HistoricalOrgRow.class))
                 .isInstanceOf(CsvProcessingException.class)
                 .satisfies(ex -> {
                     CsvProcessingException e = (CsvProcessingException) ex;
@@ -286,7 +277,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] process_invalidBase64_throwsIllegalArgument");
         System.out.println("[INPUT] String no-base64: '" + entrada + "'");
 
-        assertThatThrownBy(() -> processor.process(entrada, HistoricalOrgRow.class))
+        assertThatThrownBy(() -> CsvProcessor.process(entrada, HistoricalOrgRow.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .satisfies(ex -> System.out.println("[OUTPUT] Excepción: " + ex.getMessage()));
 
@@ -303,7 +294,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[TEST] process_integerWithDecimal_throwsTypeMismatch");
         System.out.println("[INPUT] contractNumber='3.5' pero el campo es Integer");
 
-        assertThatThrownBy(() -> processor.process(toBase64(csv), HistoricalOrgRow.class))
+        assertThatThrownBy(() -> CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class))
                 .isInstanceOf(CsvProcessingException.class)
                 .satisfies(ex -> {
                     CsvProcessingException e = (CsvProcessingException) ex;

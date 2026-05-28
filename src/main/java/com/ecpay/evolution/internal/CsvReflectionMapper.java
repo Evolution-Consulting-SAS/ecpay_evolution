@@ -1,8 +1,7 @@
-package com.ecpay.evolution.adapter;
+package com.ecpay.evolution.internal;
 
-import com.ecpay.evolution.domain.ErrorCode;
-import com.ecpay.evolution.domain.CsvProcessingException;
-import com.ecpay.evolution.domain.port.out.CsvMapperPort;
+import com.ecpay.evolution.ErrorCode;
+import com.ecpay.evolution.CsvProcessingException;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -11,7 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
 
-public class CsvReflectionMapper implements CsvMapperPort {
+public class CsvReflectionMapper {
 
     private static final Map<Class<?>, Function<String, Object>> TYPE_CONVERTERS = buildTypeConverters();
 

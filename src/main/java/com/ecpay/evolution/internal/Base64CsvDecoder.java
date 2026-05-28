@@ -1,11 +1,9 @@
-package com.ecpay.evolution.adapter;
-
-import com.ecpay.evolution.domain.port.out.CsvDecoderPort;
+package com.ecpay.evolution.internal;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-public class Base64CsvDecoder implements CsvDecoderPort {
+public class Base64CsvDecoder {
 
     private static final char UTF8_BOM = 0xFEFF;
 
