@@ -74,12 +74,18 @@ public class CsvParser {
     }
 
     private String normalizeFieldValue(String value) {
-        return stripSingleQuotes(value.trim());
+        return stripSurroundingQuotes(value.trim());
     }
 
-    private String stripSingleQuotes(String value) {
-        while (value.length() >= 2 && value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'') {
-            value = value.substring(1, value.length() - 1);
+    private String stripSurroundingQuotes(String value) {
+        while (value.length() >= 2) {
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '\'' && last == '\'') || (first == '"' && last == '"')) {
+                value = value.substring(1, value.length() - 1).trim();
+            } else {
+                break;
+            }
         }
         return value;
     }
