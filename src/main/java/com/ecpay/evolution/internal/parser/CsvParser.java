@@ -9,11 +9,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class CsvParser {
 
+    private static final Pattern UNICODE_SINGLE_QUOTES =
+            Pattern.compile("[‘’‚‛]");
+
+    private static final Pattern UNICODE_DOUBLE_QUOTES =
+            Pattern.compile("[“”„‟«»]");
+
     public List<List<String>> parse(String csvText) {
-        String[] lines = splitIntoLines(csvText);
+        String[] lines = splitIntoLines(normalizeQuoteCharacters(csvText));
         int firstLineIndex = findFirstNonEmptyLineIndex(lines);
 
         if (firstLineIndex == -1) {
@@ -71,6 +78,12 @@ public class CsvParser {
         } catch (IOException e) {
             throw new CsvProcessingException(ErrorCode.CSV_FORMAT_INVALID, dataRowNumber, null, line, null);
         }
+    }
+
+    private String normalizeQuoteCharacters(String text) {
+        return UNICODE_DOUBLE_QUOTES.matcher(
+                UNICODE_SINGLE_QUOTES.matcher(text).replaceAll("'")
+        ).replaceAll("\"");
     }
 
     private String normalizeFieldValue(String value) {

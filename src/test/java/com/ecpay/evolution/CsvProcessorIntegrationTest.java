@@ -775,4 +775,23 @@ class CsvProcessorIntegrationTest {
 
         System.out.println("[OK] Comillas simples y dobles quitadas con delimitador TAB\n");
     }
+
+    @Test
+    void csv_unicodeTypographicQuotes_strippedCorrectly() {
+        // Comillas tipográficas de Excel/Word: ‘’ (simples) y “” (dobles)
+        String csv = "COMPANYID\tDOCUMENT\tCONTRACTNUMBER\tINITIALDATE\tFINALDATE\tDEPARTMENTID\tPOSITIONID\tPOSITIONTYPE\n"
+                + "‘101681136’\t“22500131689”\t1\t2026-05-15\t2026-12-30\t10\tPOS001\tTIEMPO_COMPLETO\n";
+
+        System.out.println("[TEST] csv_unicodeTypographicQuotes_strippedCorrectly");
+        System.out.println("[INPUT] Comillas Unicode: ‘...’ (simples) y “...” (dobles)");
+
+        HistoricalOrgRow row = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class).get(0);
+
+        System.out.println("[OUTPUT] companyId=[" + row.getCompanyId() + "] | document=[" + row.getDocument() + "]");
+
+        assertThat(row.getCompanyId()).isEqualTo("101681136");
+        assertThat(row.getDocument()).isEqualTo("22500131689");
+
+        System.out.println("[OK] Comillas tipográficas Unicode normalizadas y removidas\n");
+    }
 }
