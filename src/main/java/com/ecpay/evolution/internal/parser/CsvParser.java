@@ -20,7 +20,7 @@ public class CsvParser {
             Pattern.compile("[“”„‟«»]");
 
     public List<List<String>> parse(String csvText) {
-        String[] lines = splitIntoLines(normalizeQuoteCharacters(csvText));
+        String[] lines = splitIntoLines(csvText);
         int firstLineIndex = findFirstNonEmptyLineIndex(lines);
 
         if (firstLineIndex == -1) {
@@ -87,7 +87,7 @@ public class CsvParser {
     }
 
     private String normalizeFieldValue(String value) {
-        return stripSurroundingQuotes(value.trim());
+        return stripSurroundingQuotes(normalizeQuoteCharacters(value.trim()));
     }
 
     private String stripSurroundingQuotes(String value) {
