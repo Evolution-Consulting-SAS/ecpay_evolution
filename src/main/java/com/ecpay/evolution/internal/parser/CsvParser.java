@@ -7,6 +7,7 @@ import com.opencsv.CSVParserBuilder;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class CsvParser {
@@ -20,10 +21,10 @@ public class CsvParser {
         }
 
         String firstLine = lines[firstLineIndex];
-        CSVParser openCsvParser = buildParserWithAutoDetectedDelimiter(firstLine);
+        char delimiter = DelimiterDetector.detect(firstLine);
+        CSVParser openCsvParser = new CSVParserBuilder().withSeparator(delimiter).build();
 
         int dataStartIndex = isHeader(firstLine, openCsvParser) ? firstLineIndex + 1 : firstLineIndex;
-
         return parseDataRows(openCsvParser, lines, dataStartIndex);
     }
 
@@ -38,15 +39,13 @@ public class CsvParser {
         return -1;
     }
 
-    private CSVParser buildParserWithAutoDetectedDelimiter(String firstLine) {
-        char delimiter = DelimiterDetector.detect(firstLine);
-        return new CSVParserBuilder().withSeparator(delimiter).build();
-    }
-
     private boolean isHeader(String line, CSVParser parser) {
         try {
             String[] cells = parser.parseLine(line);
-            return HeaderDetector.isHeader(cells);
+            String[] normalized = Arrays.stream(cells)
+                    .map(this::normalizeFieldValue)
+                    .toArray(String[]::new);
+            return HeaderDetector.isHeader(normalized);
         } catch (IOException e) {
             return false;
         }
@@ -67,10 +66,21 @@ public class CsvParser {
         try {
             String[] values = parser.parseLine(line);
             List<String> row = new ArrayList<>(values.length);
-            for (String v : values) row.add(v.trim());
+            for (String v : values) row.add(normalizeFieldValue(v));
             return row;
         } catch (IOException e) {
             throw new CsvProcessingException(ErrorCode.CSV_FORMAT_INVALID, dataRowNumber, null, line, null);
         }
+    }
+
+    private String normalizeFieldValue(String value) {
+        return stripSingleQuotes(value.trim());
+    }
+
+    private String stripSingleQuotes(String value) {
+        if (value.length() >= 2 && value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'') {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 }

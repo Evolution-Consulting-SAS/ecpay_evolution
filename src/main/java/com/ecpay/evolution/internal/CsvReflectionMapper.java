@@ -9,6 +9,9 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
+import java.util.Optional;
+import java.util.TimeZone;
+import java.util.Locale;
 
 public class CsvReflectionMapper {
 
@@ -68,7 +71,8 @@ public class CsvReflectionMapper {
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (Exception e) {
-            throw new CsvProcessingException(ErrorCode.CSV_MAPPING_ERROR, rowNumber, null, null, null);
+            throw (CsvProcessingException) new CsvProcessingException(
+                    ErrorCode.CSV_MAPPING_ERROR, rowNumber, null, null, null).initCause(e);
         }
     }
 
@@ -115,31 +119,49 @@ public class CsvReflectionMapper {
     }
 
     private static Object parseLongValue(String value) {
-        if (looksLikeIsoDate(value)) return isoDateToEpoch(value);
+        if (looksLikeSupportedDate(value)) return toEpochUtc(value);
         rejectIfContainsDecimalPoint(value, "Long");
         return Long.parseLong(value);
     }
 
-    private static boolean looksLikeIsoDate(String value) {
-        return value.matches("\\d{4}-\\d{2}-\\d{2}");
+    private static boolean looksLikeSupportedDate(String value) {
+        return value.matches("\\d{4}[-/]\\d{2}[-/]\\d{2}")   // yyyy-MM-dd / yyyy/MM/dd
+            || value.matches("\\d{2}[-/]\\d{2}[-/]\\d{4}");  // dd-MM-yyyy / dd/MM/yyyy
     }
 
-    private static Long isoDateToEpoch(String value) {
+    private static Long toEpochUtc(String value) {
+        return tryParseDate(value, "yyyy-MM-dd")
+                .or(() -> tryParseDate(value, "yyyy/MM/dd"))
+                .or(() -> tryParseDate(value, "dd/MM/yyyy"))
+                .or(() -> tryParseDate(value, "dd-MM-yyyy"))
+                .orElseThrow(() -> new CsvProcessingException(ErrorCode.CSV_TYPE_CONVERSION, 0, null, value, "Long(fecha)"));
+    }
+
+    private static Optional<Long> tryParseDate(String value, String pattern) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            SimpleDateFormat sdf = new SimpleDateFormat(pattern);
             sdf.setLenient(false);
-            return sdf.parse(value).getTime();
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return Optional.of(sdf.parse(value).getTime());
         } catch (ParseException e) {
-            throw new CsvProcessingException(ErrorCode.CSV_TYPE_CONVERSION, 0, null, value, "Long");
+            return Optional.empty();
         }
     }
 
     private static Object parseDoubleValue(String value) {
         try {
-            return Double.parseDouble(value);
+            return Double.parseDouble(normalizeDecimalSeparator(value));
         } catch (NumberFormatException e) {
             throw new CsvProcessingException(ErrorCode.CSV_TYPE_MISMATCH, 0, null, value, "Double");
         }
+    }
+
+    private static String normalizeDecimalSeparator(String value) {
+        String normalized = value.replace(',', '.');
+        if (normalized.chars().filter(c -> c == '.').count() > 1) {
+            throw new CsvProcessingException(ErrorCode.CSV_TYPE_MISMATCH, 0, null, value, "Double");
+        }
+        return normalized;
     }
 
     private static void rejectIfContainsDecimalPoint(String value, String targetType) {
@@ -149,7 +171,7 @@ public class CsvReflectionMapper {
     }
 
     private static Object parseBooleanValue(String value) {
-        return switch (value.toLowerCase()) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
             case "true", "si", "sí", "s", "yes", "y", "1" -> true;
             case "false", "no", "n", "0"                   -> false;
             default -> throw new CsvProcessingException(

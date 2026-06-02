@@ -284,6 +284,111 @@ class CsvProcessorIntegrationTest {
         System.out.println("[OK] IllegalArgumentException lanzada correctamente\n");
     }
 
+    // -------------------------------------------------------------------------
+    // Variantes de formato: fechas con /, double con coma, comillas
+    // -------------------------------------------------------------------------
+
+    @Test
+    void dateWithSlash_mapsToSameEpochAsDashFormat() {
+        String csvDash = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,3,2024-01-15,2024-12-31,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+        String csvSlash = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,3,2024/01/15,2024/12/31,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+
+        System.out.println("[TEST] dateWithSlash_mapsToSameEpochAsDashFormat");
+        System.out.println("[INPUT] initialDate con '-': 2024-01-15 | con '/': 2024/01/15");
+
+        HistoricalSalaryRow rowDash  = CsvProcessor.process(toBase64(csvDash),  HistoricalSalaryRow.class).get(0);
+        HistoricalSalaryRow rowSlash = CsvProcessor.process(toBase64(csvSlash), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] epoch dash=" + rowDash.getInitialDate() + " | epoch slash=" + rowSlash.getInitialDate());
+
+        assertThat(rowSlash.getInitialDate()).isEqualTo(rowDash.getInitialDate());
+        assertThat(rowSlash.getFinalDate()).isEqualTo(rowDash.getFinalDate());
+
+        System.out.println("[OK] yyyy/MM/dd produce el mismo epoch que yyyy-MM-dd\n");
+    }
+
+    @Test
+    void doubleWithComma_semicolonDelimiter_mapsCorrectly() {
+        String csv = """
+                companyId;document;contractNumber;initialDate;finalDate;salaryType;salaryClassType;salary;coinType;salaryReason;spendingAccount
+                900123456;12345678;3;2024-01-15;2024-12-31;FIJO;MENSUAL;5000000,75;COP;NORMAL;1
+                """;
+
+        System.out.println("[TEST] doubleWithComma_semicolonDelimiter_mapsCorrectly");
+        System.out.println("[INPUT] salary='5000000,75' con delimitador ';'");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] salary=" + row.getSalary());
+
+        assertThat(row.getSalary()).isEqualTo(5000000.75);
+
+        System.out.println("[OK] Coma decimal '5000000,75' → 5000000.75\n");
+    }
+
+    @Test
+    void doubleQuotedValues_areStrippedAndMappedCorrectly() {
+        String csv = "companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount\n"
+                + "\"900123456\",\"12345678\",\"3\",\"2024-01-15\",\"2024-12-31\",\"FIJO\",\"MENSUAL\",\"5000000.0\",\"COP\",\"NORMAL\",\"1\"\n";
+
+        System.out.println("[TEST] doubleQuotedValues_areStrippedAndMappedCorrectly");
+        System.out.println("[INPUT] Todos los campos entre comillas dobles \"...\"");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] companyId=" + row.getCompanyId() + " | salary=" + row.getSalary());
+
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getContractNumber()).isEqualTo(3);
+        assertThat(row.getSalary()).isEqualTo(5000000.0);
+        assertThat(row.getSalaryType()).isEqualTo("FIJO");
+
+        System.out.println("[OK] Comillas dobles stripadas por OpenCSV (RFC 4180)\n");
+    }
+
+    @Test
+    void singleQuotedValues_areStrippedAndMappedCorrectly() {
+        String csv = "companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount\n"
+                + "'900123456','12345678','3','2024-01-15','2024-12-31','FIJO','MENSUAL','5000000.0','COP','NORMAL','1'\n";
+
+        System.out.println("[TEST] singleQuotedValues_areStrippedAndMappedCorrectly");
+        System.out.println("[INPUT] Todos los campos entre comillas simples '...'");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] companyId=" + row.getCompanyId() + " | salary=" + row.getSalary());
+
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getContractNumber()).isEqualTo(3);
+        assertThat(row.getSalary()).isEqualTo(5000000.0);
+        assertThat(row.getSalaryType()).isEqualTo("FIJO");
+
+        System.out.println("[OK] Comillas simples stripadas por la librería\n");
+    }
+
+    @Test
+    void doubleWithComma_commaDelimiter_quotedField_mapsCorrectly() {
+        String csv = "companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount\n"
+                + "900123456,12345678,3,2024-01-15,2024-12-31,FIJO,MENSUAL,\"5000000,75\",COP,NORMAL,1\n";
+
+        System.out.println("[TEST] doubleWithComma_commaDelimiter_quotedField_mapsCorrectly");
+        System.out.println("[INPUT] salary=\"5000000,75\" entre comillas dobles con delimitador ','");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] salary=" + row.getSalary());
+
+        assertThat(row.getSalary()).isEqualTo(5000000.75);
+
+        System.out.println("[OK] Coma decimal protegida por comillas dobles → 5000000.75\n");
+    }
+
     @Test
     void process_integerWithDecimal_throwsTypeMismatch() {
         String csv = """
@@ -309,5 +414,342 @@ class CsvProcessorIntegrationTest {
                 });
 
         System.out.println("[OK] Error con contexto completo: fila + columna + valor incorrecto\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — formatos de fecha colombianos y variantes
+    // =========================================================================
+
+    @Test
+    void date_ddMMyyyy_slash_mapsCorrectly() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,1,15/01/2024,31/12/2024,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+
+        System.out.println("[TEST] date_ddMMyyyy_slash_mapsCorrectly");
+        System.out.println("[INPUT] initialDate='15/01/2024' (formato colombiano dd/MM/yyyy con '/')");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate()
+                + " | finalDate(epoch)=" + row.getFinalDate());
+
+        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+        assertThat(row.getFinalDate()).isNotNull();
+
+        System.out.println("[OK] dd/MM/yyyy mapeado correctamente a epoch UTC\n");
+    }
+
+    @Test
+    void date_ddMMyyyy_dash_mapsCorrectly() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,1,15-01-2024,31-12-2024,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+
+        System.out.println("[TEST] date_ddMMyyyy_dash_mapsCorrectly");
+        System.out.println("[INPUT] initialDate='15-01-2024' (formato colombiano dd-MM-yyyy con '-')");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate());
+
+        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+
+        System.out.println("[OK] dd-MM-yyyy mapeado correctamente a epoch UTC\n");
+    }
+
+    @Test
+    void date_yyyyMMdd_producesUtcEpoch() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,1,2024-01-15,2024-12-31,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+
+        System.out.println("[TEST] date_yyyyMMdd_producesUtcEpoch");
+        System.out.println("[INPUT] initialDate='2024-01-15' — verificar que epoch sea UTC midnight");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] epoch=" + row.getInitialDate()
+                + " (esperado=1705276800000 = 2024-01-15 00:00:00 UTC)");
+
+        assertThat(row.getInitialDate()).isEqualTo(1705276800000L);
+
+        System.out.println("[OK] yyyy-MM-dd produce epoch UTC correcto\n");
+    }
+
+    @Test
+    void date_invalid_throwsTypeMismatch() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
+                900123456,12345678,1,2024-13-01,2024-12-31,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
+                """;
+
+        System.out.println("[TEST] date_invalid_throwsTypeMismatch");
+        System.out.println("[INPUT] initialDate='2024-13-01' (mes 13 — inválido)");
+
+        assertThatThrownBy(() -> CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class))
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> {
+                    CsvProcessingException e = (CsvProcessingException) ex;
+                    System.out.println("[OUTPUT] Excepción: " + e.getMessage());
+                    System.out.println("         ErrorCode: " + e.getErrorCode()
+                            + " | fila: " + e.getRow() + " | columna: " + e.getColumn());
+                    assertThat(e.getErrorCode()).isIn(ErrorCode.CSV_TYPE_MISMATCH, ErrorCode.CSV_TYPE_CONVERSION);
+                    assertThat(e.getRow()).isEqualTo(1);
+                });
+
+        System.out.println("[OK] Fecha inválida lanza excepción con contexto\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — booleanos extremos
+    // =========================================================================
+
+    @Test
+    void boolean_invalid_throwsTypeMismatch() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,contributorType,subContributorType,healthPercentage,pensionPercentage,solidarityPercentage,healthAssistance,pensionAssistance,pensionForeigner
+                900123456,12345678,3,2024-01-15,2024-12-31,DEPENDIENTE,NINGUNO,12.5,16.0,2.0,maybe,no,1
+                """;
+
+        System.out.println("[TEST] boolean_invalid_throwsTypeMismatch");
+        System.out.println("[INPUT] healthAssistance='maybe' — no es un valor booleano válido");
+
+        assertThatThrownBy(() -> CsvProcessor.process(toBase64(csv), HistoricalContributorRow.class))
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> {
+                    CsvProcessingException e = (CsvProcessingException) ex;
+                    System.out.println("[OUTPUT] Excepción: " + e.getMessage());
+                    System.out.println("         ErrorCode: " + e.getErrorCode()
+                            + " | fila: " + e.getRow() + " | columna: " + e.getColumn()
+                            + " | valor: " + e.getRawValue());
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CSV_TYPE_MISMATCH);
+                    assertThat(e.getColumn()).isEqualTo("healthAssistance");
+                    assertThat(e.getRow()).isEqualTo(1);
+                });
+
+        System.out.println("[OK] Booleano inválido lanza CSV_TYPE_MISMATCH con fila y columna\n");
+    }
+
+    @Test
+    void boolean_uppercaseSi_mapsTrue() {
+        String csv = """
+                companyId,document,contractNumber,initialDate,finalDate,contributorType,subContributorType,healthPercentage,pensionPercentage,solidarityPercentage,healthAssistance,pensionAssistance,pensionForeigner
+                900123456,12345678,3,2024-01-15,2024-12-31,DEPENDIENTE,NINGUNO,12.5,16.0,2.0,SI,NO,SÍ
+                """;
+
+        System.out.println("[TEST] boolean_uppercaseSi_mapsTrue");
+        System.out.println("[INPUT] healthAssistance='SI' | pensionAssistance='NO' | pensionForeigner='SÍ' (mayúsculas)");
+
+        HistoricalContributorRow row = CsvProcessor.process(toBase64(csv), HistoricalContributorRow.class).get(0);
+
+        System.out.println("[OUTPUT] healthAssistance=" + row.getHealthAssistance()
+                + " | pensionAssistance=" + row.getPensionAssistance()
+                + " | pensionForeigner=" + row.getPensionForeigner());
+
+        assertThat(row.getHealthAssistance()).isTrue();
+        assertThat(row.getPensionAssistance()).isFalse();
+        assertThat(row.getPensionForeigner()).isTrue();
+
+        System.out.println("[OK] 'SI'→true, 'NO'→false, 'SÍ'→true\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — números con separadores de miles europeos
+    // =========================================================================
+
+    @Test
+    void double_europeanThousandsSeparator_throwsMismatch() {
+        String csv = """
+                companyId;document;contractNumber;initialDate;finalDate;salaryType;salaryClassType;salary;coinType;salaryReason;spendingAccount
+                900123456;12345678;1;2024-01-15;2024-12-31;FIJO;MENSUAL;1.000.000,50;COP;NORMAL;1
+                """;
+
+        System.out.println("[TEST] double_europeanThousandsSeparator_throwsMismatch");
+        System.out.println("[INPUT] salary='1.000.000,50' — punto como miles y coma como decimal (ambiguo)");
+
+        assertThatThrownBy(() -> CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class))
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> {
+                    CsvProcessingException e = (CsvProcessingException) ex;
+                    System.out.println("[OUTPUT] Excepción: " + e.getMessage());
+                    System.out.println("         ErrorCode: " + e.getErrorCode()
+                            + " | columna: " + e.getColumn() + " | valor: " + e.getRawValue());
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CSV_TYPE_MISMATCH);
+                    assertThat(e.getColumn()).isEqualTo("salary");
+                });
+
+        System.out.println("[OK] Formato europeo con miles lanza error claro en lugar de dato corrupto\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — estructura del CSV (columnas de más o de menos)
+    // =========================================================================
+
+    @Test
+    void csv_fewerColumnsThanFields_remainsNullOrZero() {
+        // CSV solo trae 5 columnas; HistoricalOrgRow tiene 8 campos
+        String csv = "900123456,12345678,3,2024-01-15,2024-12-31\n";
+
+        System.out.println("[TEST] csv_fewerColumnsThanFields_remainsNullOrZero");
+        System.out.println("[INPUT] CSV con 5 columnas — HistoricalOrgRow tiene 8 campos");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+        HistoricalOrgRow row = result.get(0);
+
+        System.out.println("[OUTPUT] departmentId=" + row.getDepartmentId()
+                + " | positionId=" + row.getPositionId()
+                + " | positionType=" + row.getPositionType());
+
+        assertThat(result).hasSize(1);
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getDepartmentId()).isNull();
+        assertThat(row.getPositionId()).isNull();
+        assertThat(row.getPositionType()).isNull();
+
+        System.out.println("[OK] Campos sin columna en CSV quedan null — sin error\n");
+    }
+
+    @Test
+    void csv_moreColumnsThanFields_extraIgnored() {
+        // CSV trae 10 columnas; HistoricalOrgRow tiene 8 campos
+        String csv = "900123456,12345678,3,2024-01-15,2024-12-31,10,POS001,TIEMPO_COMPLETO,EXTRA1,EXTRA2\n";
+
+        System.out.println("[TEST] csv_moreColumnsThanFields_extraIgnored");
+        System.out.println("[INPUT] CSV con 10 columnas — HistoricalOrgRow tiene 8 campos");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+        HistoricalOrgRow row = result.get(0);
+
+        System.out.println("[OUTPUT] companyId=" + row.getCompanyId()
+                + " | positionType=" + row.getPositionType() + " (columnas extra ignoradas)");
+
+        assertThat(result).hasSize(1);
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getPositionType()).isEqualTo("TIEMPO_COMPLETO");
+
+        System.out.println("[OK] Columnas extra ignoradas — sin error\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — comillas simples en header y datos
+    // =========================================================================
+
+    @Test
+    void csv_singleQuotedHeader_detectedAndSkipped() {
+        String csv = "'companyId','document','contractNumber','initialDate','finalDate','departmentId','positionId','positionType'\n"
+                + "900123456,12345678,3,2024-01-15,2024-12-31,10,POS001,TIEMPO_COMPLETO\n";
+
+        System.out.println("[TEST] csv_singleQuotedHeader_detectedAndSkipped");
+        System.out.println("[INPUT] Header con todas las columnas entre comillas simples '...'");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+
+        System.out.println("[OUTPUT] filas=" + result.size()
+                + " | companyId=" + result.get(0).getCompanyId());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getCompanyId()).isEqualTo("900123456");
+        assertThat(result.get(0).getPositionId()).isEqualTo("POS001");
+
+        System.out.println("[OK] Header con comillas simples detectado y saltado\n");
+    }
+
+    @Test
+    void csv_noHeader_singleQuotedValues_mapsCorrectly() {
+        String csv = "'900123456','12345678','3','2024-01-15','2024-12-31','10','POS001','TIEMPO_COMPLETO'\n";
+
+        System.out.println("[TEST] csv_noHeader_singleQuotedValues_mapsCorrectly");
+        System.out.println("[INPUT] Sin header — primera línea son datos con comillas simples");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+        HistoricalOrgRow row = result.get(0);
+
+        System.out.println("[OUTPUT] companyId=" + row.getCompanyId()
+                + " | contractNumber=" + row.getContractNumber()
+                + " | departmentId=" + row.getDepartmentId());
+
+        assertThat(result).hasSize(1);
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getContractNumber()).isEqualTo(3);
+        assertThat(row.getDepartmentId()).isEqualTo(10);
+        assertThat(row.getPositionId()).isEqualTo("POS001");
+
+        System.out.println("[OK] Datos con comillas simples sin header mapeados correctamente\n");
+    }
+
+    @Test
+    void csv_semicolonDelimiter_singleQuotedValues_mapsCorrectly() {
+        String csv = "'companyId';'document';'contractNumber';'initialDate';'finalDate';'departmentId';'positionId';'positionType'\n"
+                + "'900123456';'12345678';'3';'2024-01-15';'2024-12-31';'10';'POS001';'TIEMPO_COMPLETO'\n";
+
+        System.out.println("[TEST] csv_semicolonDelimiter_singleQuotedValues_mapsCorrectly");
+        System.out.println("[INPUT] Delimitador ';' + valores entre comillas simples");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+        HistoricalOrgRow row = result.get(0);
+
+        System.out.println("[OUTPUT] companyId=" + row.getCompanyId()
+                + " | departmentId=" + row.getDepartmentId());
+
+        assertThat(result).hasSize(1);
+        assertThat(row.getCompanyId()).isEqualTo("900123456");
+        assertThat(row.getDepartmentId()).isEqualTo(10);
+        assertThat(row.getPositionType()).isEqualTo("TIEMPO_COMPLETO");
+
+        System.out.println("[OK] ';' + comillas simples procesados correctamente\n");
+    }
+
+    // =========================================================================
+    // STRESS TESTS — líneas en blanco intercaladas y BOM con semicolón
+    // =========================================================================
+
+    @Test
+    void csv_multipleBlankLines_ignored() {
+        String csv = "companyId,document,contractNumber,initialDate,finalDate,departmentId,positionId,positionType\n"
+                + "\n"
+                + "900123456,11111111,1,2024-01-15,2024-12-31,10,POS001,TIEMPO_COMPLETO\n"
+                + "\n"
+                + "900123456,22222222,2,2024-03-01,2024-12-31,20,POS002,MEDIO_TIEMPO\n"
+                + "\n";
+
+        System.out.println("[TEST] csv_multipleBlankLines_ignored");
+        System.out.println("[INPUT] CSV con líneas en blanco antes, entre y después de los datos");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class);
+
+        System.out.println("[OUTPUT] filas=" + result.size());
+        result.forEach(r -> System.out.println("  document=" + r.getDocument()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getDocument()).isEqualTo("11111111");
+        assertThat(result.get(1).getDocument()).isEqualTo("22222222");
+
+        System.out.println("[OK] Líneas en blanco ignoradas — solo 2 filas de datos\n");
+    }
+
+    @Test
+    void csv_withBom_semicolonDelimiter_mapsCorrectly() {
+        String csvSinBom = "companyId;document;contractNumber;initialDate;finalDate;departmentId;positionId;positionType\n"
+                + "900123456;12345678;3;2024-01-15;2024-12-31;10;POS001;TIEMPO_COMPLETO\n";
+        String csvConBom = "﻿" + csvSinBom;
+        String base64 = Base64.getEncoder().encodeToString(csvConBom.getBytes(StandardCharsets.UTF_8));
+
+        System.out.println("[TEST] csv_withBom_semicolonDelimiter_mapsCorrectly");
+        System.out.println("[INPUT] BOM de Excel + delimitador ';'");
+
+        List<HistoricalOrgRow> result = CsvProcessor.process(base64, HistoricalOrgRow.class);
+
+        System.out.println("[OUTPUT] companyId=" + result.get(0).getCompanyId()
+                + " | departmentId=" + result.get(0).getDepartmentId());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getCompanyId()).isEqualTo("900123456");
+        assertThat(result.get(0).getDepartmentId()).isEqualTo(10);
+
+        System.out.println("[OK] BOM + semicolón procesados correctamente\n");
     }
 }
