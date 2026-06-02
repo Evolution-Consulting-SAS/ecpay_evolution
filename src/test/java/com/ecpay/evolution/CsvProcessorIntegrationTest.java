@@ -428,17 +428,17 @@ class CsvProcessorIntegrationTest {
                 """;
 
         System.out.println("[TEST] date_ddMMyyyy_slash_mapsCorrectly");
-        System.out.println("[INPUT] initialDate='15/01/2024' (formato colombiano dd/MM/yyyy con '/')");
+        System.out.println("[INPUT] initialDate='15/01/2024' (formato dd/MM/yyyy con '/')");
 
         HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
 
         System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate()
                 + " | finalDate(epoch)=" + row.getFinalDate());
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+        assertThat(row.getInitialDate()).isEqualTo(1705291200000L); // 2024-01-15 00:00:00 America/Santo_Domingo
         assertThat(row.getFinalDate()).isNotNull();
 
-        System.out.println("[OK] dd/MM/yyyy mapeado correctamente a epoch UTC\n");
+        System.out.println("[OK] dd/MM/yyyy mapeado correctamente a epoch America/Santo_Domingo\n");
     }
 
     @Test
@@ -449,35 +449,35 @@ class CsvProcessorIntegrationTest {
                 """;
 
         System.out.println("[TEST] date_ddMMyyyy_dash_mapsCorrectly");
-        System.out.println("[INPUT] initialDate='15-01-2024' (formato colombiano dd-MM-yyyy con '-')");
+        System.out.println("[INPUT] initialDate='15-01-2024' (formato dd-MM-yyyy con '-')");
 
         HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
 
         System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate());
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+        assertThat(row.getInitialDate()).isEqualTo(1705291200000L); // 2024-01-15 00:00:00 America/Santo_Domingo
 
-        System.out.println("[OK] dd-MM-yyyy mapeado correctamente a epoch UTC\n");
+        System.out.println("[OK] dd-MM-yyyy mapeado correctamente a epoch America/Santo_Domingo\n");
     }
 
     @Test
-    void date_yyyyMMdd_producesUtcEpoch() {
+    void date_yyyyMMdd_producesLocalEpoch() {
         String csv = """
                 companyId,document,contractNumber,initialDate,finalDate,salaryType,salaryClassType,salary,coinType,salaryReason,spendingAccount
                 900123456,12345678,1,2024-01-15,2024-12-31,FIJO,MENSUAL,5000000.0,COP,NORMAL,1
                 """;
 
-        System.out.println("[TEST] date_yyyyMMdd_producesUtcEpoch");
-        System.out.println("[INPUT] initialDate='2024-01-15' — verificar que epoch sea UTC midnight");
+        System.out.println("[TEST] date_yyyyMMdd_producesLocalEpoch");
+        System.out.println("[INPUT] initialDate='2024-01-15' — verificar epoch en America/Santo_Domingo");
 
         HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
 
         System.out.println("[OUTPUT] epoch=" + row.getInitialDate()
-                + " (esperado=1705276800000 = 2024-01-15 00:00:00 UTC)");
+                + " (esperado=1705291200000 = 2024-01-15 00:00:00 America/Santo_Domingo / UTC-4)");
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L);
+        assertThat(row.getInitialDate()).isEqualTo(1705291200000L);
 
-        System.out.println("[OK] yyyy-MM-dd produce epoch UTC correcto\n");
+        System.out.println("[OK] yyyy-MM-dd produce epoch correcto en America/Santo_Domingo\n");
     }
 
     @Test

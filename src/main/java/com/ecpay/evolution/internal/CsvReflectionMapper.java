@@ -141,7 +141,7 @@ public class CsvReflectionMapper {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat(pattern);
             sdf.setLenient(false);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            sdf.setTimeZone(TimeZone.getTimeZone("America/Santo_Domingo"));
             return Optional.of(sdf.parse(value).getTime());
         } catch (ParseException e) {
             return Optional.empty();
