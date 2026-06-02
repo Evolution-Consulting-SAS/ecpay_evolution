@@ -752,4 +752,27 @@ class CsvProcessorIntegrationTest {
 
         System.out.println("[OK] BOM + semicolón procesados correctamente\n");
     }
+    // =========================================================================
+    // STRESS TESTS — comillas en CSV con delimitador TAB
+    // =========================================================================
+
+    @Test
+    void csv_tabDelimiter_mixedQuotes_strippedCorrectly() {
+        // Simula exactamente el formato que viene del sistema: TAB + comillas simples y dobles mezcladas
+        String csv = "COMPANYID\tDOCUMENT\tCONTRACTNUMBER\tINITIALDATE\tFINALDATE\tDEPARTMENTID\tPOSITIONID\tPOSITIONTYPE\n"
+                + "'101681136'\t\"22500131689\"\t1\t2026-05-15\t2026-12-30\t10\tPOS001\tTIEMPO_COMPLETO\n";
+
+        System.out.println("[TEST] csv_tabDelimiter_mixedQuotes_strippedCorrectly");
+        System.out.println("[INPUT] TAB delimitador | companyId con '' | document con \"\"");
+
+        HistoricalOrgRow row = CsvProcessor.process(toBase64(csv), HistoricalOrgRow.class).get(0);
+
+        System.out.println("[OUTPUT] companyId=[" + row.getCompanyId() + "]"
+                + " | document=[" + row.getDocument() + "]");
+
+        assertThat(row.getCompanyId()).isEqualTo("101681136");   // sin comillas simples
+        assertThat(row.getDocument()).isEqualTo("22500131689");  // sin comillas dobles
+
+        System.out.println("[OK] Comillas simples y dobles quitadas con delimitador TAB\n");
+    }
 }

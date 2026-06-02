@@ -78,8 +78,8 @@ public class CsvParser {
     }
 
     private String stripSingleQuotes(String value) {
-        if (value.length() >= 2 && value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'') {
-            return value.substring(1, value.length() - 1);
+        while (value.length() >= 2 && value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'') {
+            value = value.substring(1, value.length() - 1);
         }
         return value;
     }
