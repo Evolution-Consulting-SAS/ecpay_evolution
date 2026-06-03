@@ -128,11 +128,11 @@ public class CsvReflectionMapper {
     }
 
     private static Long isoDateToEpoch(String value) {
-        return tryParseDate(value, "yyyy-MM-dd")
-                .or(() -> tryParseDate(value, "yyyy/MM/dd"))
-                .or(() -> tryParseDate(value, "dd/MM/yyyy"))
-                .or(() -> tryParseDate(value, "dd-MM-yyyy"))
-                .orElseThrow(() -> new CsvProcessingException(ErrorCode.CSV_TYPE_CONVERSION, 0, null, value, "Long(fecha)"));
+        for (String pattern : new String[]{"yyyy-MM-dd", "yyyy/MM/dd", "dd/MM/yyyy", "dd-MM-yyyy"}) {
+            Optional<Long> result = tryParseDate(value, pattern);
+            if (result.isPresent()) return result.get();
+        }
+        throw new CsvProcessingException(ErrorCode.CSV_TYPE_CONVERSION, 0, null, value, "Long(fecha)");
     }
 
     private static Optional<Long> tryParseDate(String value, String pattern) {
