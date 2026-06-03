@@ -87,10 +87,10 @@ public class CsvParser {
     }
 
     private String normalizeFieldValue(String value) {
-        return stripSurroundingQuotes(normalizeQuoteCharacters(value.trim()));
+        return unwrapQuotes(normalizeQuoteCharacters(value.trim()));
     }
 
-    private String stripSurroundingQuotes(String value) {
+    private String unwrapQuotes(String value) {
         while (value.length() >= 2) {
             char first = value.charAt(0);
             char last = value.charAt(value.length() - 1);
