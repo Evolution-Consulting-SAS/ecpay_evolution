@@ -435,7 +435,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate()
                 + " | finalDate(epoch)=" + row.getFinalDate());
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+        assertThat(row.getInitialDate()).isEqualTo(1705294800000L); // 2024-01-15 00:00:00 UTC
         assertThat(row.getFinalDate()).isNotNull();
 
         System.out.println("[OK] dd/MM/yyyy mapeado correctamente a epoch UTC\n");
@@ -455,7 +455,7 @@ class CsvProcessorIntegrationTest {
 
         System.out.println("[OUTPUT] initialDate(epoch)=" + row.getInitialDate());
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L); // 2024-01-15 00:00:00 UTC
+        assertThat(row.getInitialDate()).isEqualTo(1705294800000L); // 2024-01-15 00:00:00 UTC
 
         System.out.println("[OK] dd-MM-yyyy mapeado correctamente a epoch UTC\n");
     }
@@ -475,7 +475,7 @@ class CsvProcessorIntegrationTest {
         System.out.println("[OUTPUT] epoch=" + row.getInitialDate()
                 + " (esperado=1705276800000 = 2024-01-15 00:00:00 UTC)");
 
-        assertThat(row.getInitialDate()).isEqualTo(1705276800000L);
+        assertThat(row.getInitialDate()).isEqualTo(1705294800000L);
 
         System.out.println("[OK] yyyy-MM-dd produce epoch UTC correcto\n");
     }

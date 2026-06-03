@@ -10,7 +10,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.Optional;
-import java.util.TimeZone;
 import java.util.Locale;
 
 public class CsvReflectionMapper {
@@ -140,7 +139,6 @@ public class CsvReflectionMapper {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat(pattern);
             sdf.setLenient(false);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
             return Optional.of(sdf.parse(value).getTime());
         } catch (ParseException e) {
             return Optional.empty();
