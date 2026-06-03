@@ -562,27 +562,41 @@ class CsvProcessorIntegrationTest {
     // =========================================================================
 
     @Test
-    void double_europeanThousandsSeparator_throwsMismatch() {
+    void double_europeanThousandsSeparator_mapsCorrectly() {
         String csv = """
                 companyId;document;contractNumber;initialDate;finalDate;salaryType;salaryClassType;salary;coinType;salaryReason;spendingAccount
                 900123456;12345678;1;2024-01-15;2024-12-31;FIJO;MENSUAL;1.000.000,50;COP;NORMAL;1
                 """;
 
-        System.out.println("[TEST] double_europeanThousandsSeparator_throwsMismatch");
-        System.out.println("[INPUT] salary='1.000.000,50' — punto como miles y coma como decimal (ambiguo)");
+        System.out.println("[TEST] double_europeanThousandsSeparator_mapsCorrectly");
+        System.out.println("[INPUT] salary='1.000.000,50' — punto como miles, coma como decimal");
 
-        assertThatThrownBy(() -> CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class))
-                .isInstanceOf(CsvProcessingException.class)
-                .satisfies(ex -> {
-                    CsvProcessingException e = (CsvProcessingException) ex;
-                    System.out.println("[OUTPUT] Excepción: " + e.getMessage());
-                    System.out.println("         ErrorCode: " + e.getErrorCode()
-                            + " | columna: " + e.getColumn() + " | valor: " + e.getRawValue());
-                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CSV_TYPE_MISMATCH);
-                    assertThat(e.getColumn()).isEqualTo("salary");
-                });
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
 
-        System.out.println("[OK] Formato europeo con miles lanza error claro en lugar de dato corrupto\n");
+        System.out.println("[OUTPUT] salary=" + row.getSalary());
+
+        assertThat(row.getSalary()).isEqualTo(1000000.50);
+
+        System.out.println("[OK] Formato europeo '1.000.000,50' → 1000000.50\n");
+    }
+
+    @Test
+    void double_angloSaxonThousandsSeparator_mapsCorrectly() {
+        String csv = """
+                companyId;document;contractNumber;initialDate;finalDate;salaryType;salaryClassType;salary;coinType;salaryReason;spendingAccount
+                900123456;12345678;1;2024-01-15;2024-12-31;FIJO;MENSUAL;1,000,000.50;COP;NORMAL;1
+                """;
+
+        System.out.println("[TEST] double_angloSaxonThousandsSeparator_mapsCorrectly");
+        System.out.println("[INPUT] salary='1,000,000.50' — coma como miles, punto como decimal");
+
+        HistoricalSalaryRow row = CsvProcessor.process(toBase64(csv), HistoricalSalaryRow.class).get(0);
+
+        System.out.println("[OUTPUT] salary=" + row.getSalary());
+
+        assertThat(row.getSalary()).isEqualTo(1000000.50);
+
+        System.out.println("[OK] Formato anglosajón '1,000,000.50' → 1000000.50\n");
     }
 
     // =========================================================================

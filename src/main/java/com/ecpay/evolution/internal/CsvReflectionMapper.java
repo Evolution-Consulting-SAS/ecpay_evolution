@@ -154,11 +154,21 @@ public class CsvReflectionMapper {
     }
 
     private static String normalizeDecimalSeparator(String value) {
-        String normalized = value.replace(',', '.');
-        if (normalized.chars().filter(c -> c == '.').count() > 1) {
-            throw new CsvProcessingException(ErrorCode.CSV_TYPE_MISMATCH, 0, null, value, "Double");
+        boolean hasComma = value.contains(",");
+        boolean hasDot   = value.contains(".");
+
+        if (hasComma && hasDot) {
+            boolean commaIsDecimal = value.lastIndexOf(',') > value.lastIndexOf('.');
+            if (commaIsDecimal) {
+                return value.replace(".", "").replace(',', '.');
+            } else {
+                return value.replace(",", "");
+            }
         }
-        return normalized;
+        if (hasComma) {
+            return value.replace(',', '.');
+        }
+        return value;
     }
 
     private static void rejectIfContainsDecimalPoint(String value, String targetType) {
