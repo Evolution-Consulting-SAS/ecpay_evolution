@@ -54,8 +54,7 @@ public class CsvReflectionMapper {
         return instance;
     }
 
-    // Mapeo por posición: fields[0] ← values.get(0), fields[1] ← values.get(1), etc.
-    // El orden de declaración de campos en el POJO debe coincidir con el orden de columnas del CSV.
+    
     private void populateFieldsFromRow(Object instance, Field[] fields, List<String> values, int rowNumber) {
         for (int i = 0; i < fields.length; i++) {
             String rawValue = i < values.size() ? values.get(i) : null;
@@ -119,17 +118,17 @@ public class CsvReflectionMapper {
     }
 
     private static Object parseLongValue(String value) {
-        if (looksLikeSupportedDate(value)) return toEpochUtc(value);
+        if (looksLikeIsoDate(value)) return isoDateToEpoch(value);
         rejectIfContainsDecimalPoint(value, "Long");
         return Long.parseLong(value);
     }
 
-    private static boolean looksLikeSupportedDate(String value) {
+    private static boolean looksLikeIsoDate(String value) {
         return value.matches("\\d{4}[-/]\\d{2}[-/]\\d{2}")   // yyyy-MM-dd / yyyy/MM/dd
             || value.matches("\\d{2}[-/]\\d{2}[-/]\\d{4}");  // dd-MM-yyyy / dd/MM/yyyy
     }
 
-    private static Long toEpochUtc(String value) {
+    private static Long isoDateToEpoch(String value) {
         return tryParseDate(value, "yyyy-MM-dd")
                 .or(() -> tryParseDate(value, "yyyy/MM/dd"))
                 .or(() -> tryParseDate(value, "dd/MM/yyyy"))
@@ -141,7 +140,7 @@ public class CsvReflectionMapper {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat(pattern);
             sdf.setLenient(false);
-            sdf.setTimeZone(TimeZone.getTimeZone("America/Santo_Domingo"));
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
             return Optional.of(sdf.parse(value).getTime());
         } catch (ParseException e) {
             return Optional.empty();
