@@ -25,7 +25,7 @@ class CsvTableReadTest {
     }
 
     @Test
-    void readTable_returnsHeaderAndRecordsWithPhysicalLinesForLf() {
+    void readTable_keepsBlankDataRecordAtItsPhysicalLineForLf() {
         CsvTable table = CsvProcessor.readTable(toBase64(
                 "codigo,descripcion,hijo\nADM,Administración,\n\nVEN,Ventas,ADM\n"));
 
@@ -34,27 +34,72 @@ class CsvTableReadTest {
                 new CsvRecord(1, 1, 1, List.of("codigo", "descripcion", "hijo")));
         assertThat(table.records()).containsExactly(
                 new CsvRecord(2, 2, 2, List.of("ADM", "Administración", "")),
+                new CsvRecord(3, 3, 3, List.of("")),
                 new CsvRecord(4, 4, 4, List.of("VEN", "Ventas", "ADM")));
     }
 
     @Test
-    void readTable_countsCrlfLinesLikeLf() {
+    void readTable_keepsBlankDataRecordAtItsPhysicalLineForCrlf() {
         CsvTable table = CsvProcessor.readTable(toBase64(
                 "codigo,descripcion\r\nADM,Administración\r\n\r\nVEN,Ventas\r\n"));
 
         assertThat(table.records()).containsExactly(
                 new CsvRecord(2, 2, 2, List.of("ADM", "Administración")),
+                new CsvRecord(3, 3, 3, List.of("")),
                 new CsvRecord(4, 4, 4, List.of("VEN", "Ventas")));
+    }
+
+    @Test
+    void readTable_keepsBlankAndWhitespaceValuesOfOneColumnFileForLf() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\nADM\n\n   \nVEN\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("   ")),
+                new CsvRecord(5, 5, 5, List.of("VEN")));
+    }
+
+    @Test
+    void readTable_keepsBlankValueOfOneColumnFileForCrlf() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\r\nADM\r\n\r\nVEN\r\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("VEN")));
+    }
+
+    @Test
+    void readTable_treatsFinalLineBreakAsTerminatorButKeepsTrailingBlankLine() {
+        CsvTable terminated = CsvProcessor.readTable(toBase64("codigo\nADM\n"));
+        CsvTable trailingBlank = CsvProcessor.readTable(toBase64("codigo\nADM\n\n"));
+
+        assertThat(terminated.records()).containsExactly(new CsvRecord(2, 2, 2, List.of("ADM")));
+        assertThat(trailingBlank.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")));
+    }
+
+    @Test
+    void readTable_skipsBlankLinesBeforeHeaderAndStillCountsThemAsRecordsAndLines() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "\n  \r\n2024-01-01,100\n2024-02-01,200\n"));
+
+        assertThat(table.header()).isEqualTo(new CsvRecord(3, 3, 3, List.of("2024-01-01", "100")));
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(4, 4, 4, List.of("2024-02-01", "200")));
     }
 
     @Test
     void readTable_keepsQuotedLineBreakInsideOneRecordSpanningPhysicalLines() {
         CsvTable table = CsvProcessor.readTable(toBase64(
-                "codigo,descripcion\nADM,\"Administración\ny finanzas\"\nVEN,Ventas\n"));
+                "codigo,descripcion\nADM,\"Administración\ny finanzas\"\n\nVEN,Ventas\n"));
 
         assertThat(table.records()).containsExactly(
                 new CsvRecord(2, 2, 3, List.of("ADM", "Administración\ny finanzas")),
-                new CsvRecord(3, 4, 4, List.of("VEN", "Ventas")));
+                new CsvRecord(3, 4, 4, List.of("")),
+                new CsvRecord(4, 5, 5, List.of("VEN", "Ventas")));
     }
 
     @Test
@@ -64,15 +109,6 @@ class CsvTableReadTest {
 
         assertThat(table.records()).containsExactly(
                 new CsvRecord(2, 2, 3, List.of("ADM", "Administración\ny finanzas")));
-    }
-
-    @Test
-    void readTable_takesFirstNonBlankRecordAsHeaderWithoutGuessing() {
-        CsvTable table = CsvProcessor.readTable(toBase64("\n\n2024-01-01,100\n2024-02-01,200\n"));
-
-        assertThat(table.header()).isEqualTo(new CsvRecord(3, 3, 3, List.of("2024-01-01", "100")));
-        assertThat(table.records()).containsExactly(
-                new CsvRecord(4, 4, 4, List.of("2024-02-01", "200")));
     }
 
     @Test
@@ -99,13 +135,6 @@ class CsvTableReadTest {
     }
 
     @Test
-    void readTable_keepsWhitespaceOnlyRecordWhenItHasSeveralCells() {
-        CsvTable table = CsvProcessor.readTable(toBase64("codigo,descripcion\n   \n  ,  \n"));
-
-        assertThat(table.records()).containsExactly(new CsvRecord(3, 3, 3, List.of("  ", "  ")));
-    }
-
-    @Test
     void readTable_returnsHeaderOnlyFileWithoutRecords() {
         CsvTable table = CsvProcessor.readTable(toBase64("codigo,descripcion\n"));
 
@@ -114,13 +143,28 @@ class CsvTableReadTest {
     }
 
     @Test
-    void readTable_ignoresDelimiterInsideQuotedHeaderCell() {
+    void readTable_detectsEachSupportedDelimiter() {
+        for (char delimiter : new char[]{';', ',', '\t', '|'}) {
+            String separator = String.valueOf(delimiter);
+            CsvTable table = CsvProcessor.readTable(toBase64(
+                    String.join(separator, "codigo", "descripcion") + "\n"
+                            + String.join(separator, "ADM", "Administración") + "\n"));
+
+            assertThat(table.delimiter()).isEqualTo(delimiter);
+            assertThat(table.header().cells()).containsExactly("codigo", "descripcion");
+            assertThat(table.records().get(0).cells()).containsExactly("ADM", "Administración");
+        }
+    }
+
+    @Test
+    void readTable_ignoresCandidateDelimitersInsideQuotedHeaderCells() {
         CsvTable table = CsvProcessor.readTable(toBase64(
-                "\"Apellido, Nombre\";documento\n\"Pérez, Ana\";123\n"));
+                "\"Apellido, Nombre\";\"tipo|clase\";documento\n\"Pérez, Ana\";A;123\n"));
 
         assertThat(table.delimiter()).isEqualTo(';');
-        assertThat(table.header().cells()).containsExactly("Apellido, Nombre", "documento");
-        assertThat(table.records().get(0).cells()).containsExactly("Pérez, Ana", "123");
+        assertThat(table.header().cells())
+                .containsExactly("Apellido, Nombre", "tipo|clase", "documento");
+        assertThat(table.records().get(0).cells()).containsExactly("Pérez, Ana", "A", "123");
     }
 
     @Test
@@ -137,10 +181,11 @@ class CsvTableReadTest {
 
     @Test
     void readTable_usesCommaForSingleColumnFile() {
-        CsvTable table = CsvProcessor.readTable(toBase64("codigo\nADM\n"));
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\nADM\n\"A,B\"\n"));
 
         assertThat(table.delimiter()).isEqualTo(',');
-        assertThat(table.records()).containsExactly(new CsvRecord(2, 2, 2, List.of("ADM")));
+        assertThat(table.records()).extracting(CsvRecord::cells)
+                .containsExactly(List.of("ADM"), List.of("A,B"));
     }
 
     @Test
@@ -148,6 +193,21 @@ class CsvTableReadTest {
         CsvProcessingException failure = readFailure(toBase64("a;b,c;d,e\n1;2,3;4,5\n"));
 
         assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
+    void readTable_doesNotLetAnotherDelimiterWinWhenMalformedHeaderQuoteBecomesLiteral() {
+        CsvProcessingException failure = readFailure(toBase64("a,\"b;c\n1,2\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
+    void readTable_reportsFormatErrorWhenHeaderQuoteIsMalformedForEveryDelimiter() {
+        CsvProcessingException failure = readFailure(toBase64("\"abierta,b\nx,y\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(1);
     }
 
     @Test

@@ -14,16 +14,29 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class CsvTableReader {
 
     public CsvTable read(String csvText) {
         char delimiter = RecordDelimiterDetector.detect(csvText);
-        List<CsvRecord> records = readNonBlankRecords(csvText, delimiter);
-        if (records.isEmpty()) {
-            throw new CsvProcessingException(ErrorCode.CSV_EMPTY_FILE, 0, null, null, null);
+        try (CSVReader reader = openReader(csvText, delimiter)) {
+            CsvRecord header = readHeader(reader).orElseThrow(() ->
+                    new CsvProcessingException(ErrorCode.CSV_EMPTY_FILE, 0, null, null, null));
+            List<CsvRecord> records = new ArrayList<>();
+            CsvRecord record;
+            while ((record = readRecord(reader)) != null) {
+                records.add(record);
+            }
+            return new CsvTable(delimiter, header, records);
+        } catch (CsvMalformedLineException e) {
+            int startLine = Math.toIntExact(e.getLineNumber());
+            throw (CsvProcessingException) new CsvProcessingException(
+                    ErrorCode.CSV_FORMAT_INVALID, startLine, null, null, null).initCause(e);
+        } catch (IOException | CsvValidationException e) {
+            throw (CsvProcessingException) new CsvProcessingException(
+                    ErrorCode.CSV_FORMAT_INVALID, 0, null, null, null).initCause(e);
         }
-        return new CsvTable(delimiter, records.get(0), records.subList(1, records.size()));
     }
 
     static CSVReader openReader(String csvText, char delimiter) {
@@ -33,34 +46,31 @@ public class CsvTableReader {
                 .build();
     }
 
-    static boolean isBlankRecord(String[] cells) {
-        return cells.length == 1 && cells[0].isBlank();
+    static boolean isBlankRecord(List<String> cells) {
+        return cells.size() == 1 && cells.get(0).isBlank();
     }
 
-    private List<CsvRecord> readNonBlankRecords(String csvText, char delimiter) {
-        List<CsvRecord> records = new ArrayList<>();
-        try (CSVReader reader = openReader(csvText, delimiter)) {
-            while (true) {
-                int startLine = Math.toIntExact(reader.getLinesRead()) + 1;
-                String[] cells = reader.readNext();
-                if (cells == null) {
-                    return records;
-                }
-                if (!isBlankRecord(cells)) {
-                    records.add(new CsvRecord(
-                            Math.toIntExact(reader.getRecordsRead()),
-                            startLine,
-                            Math.toIntExact(reader.getLinesRead()),
-                            List.of(cells)));
-                }
+    static Optional<CsvRecord> readHeader(CSVReader reader)
+            throws IOException, CsvValidationException {
+        for (CsvRecord record = readRecord(reader); record != null; record = readRecord(reader)) {
+            if (!isBlankRecord(record.cells())) {
+                return Optional.of(record);
             }
-        } catch (CsvMalformedLineException e) {
-            int startLine = Math.toIntExact(e.getLineNumber());
-            throw (CsvProcessingException) new CsvProcessingException(
-                    ErrorCode.CSV_FORMAT_INVALID, startLine, null, null, null).initCause(e);
-        } catch (IOException | CsvValidationException e) {
-            throw (CsvProcessingException) new CsvProcessingException(
-                    ErrorCode.CSV_FORMAT_INVALID, 0, null, null, null).initCause(e);
         }
+        return Optional.empty();
+    }
+
+    private static CsvRecord readRecord(CSVReader reader)
+            throws IOException, CsvValidationException {
+        int startLine = Math.toIntExact(reader.getLinesRead()) + 1;
+        String[] cells = reader.readNext();
+        if (cells == null) {
+            return null;
+        }
+        return new CsvRecord(
+                Math.toIntExact(reader.getRecordsRead()),
+                startLine,
+                Math.toIntExact(reader.getLinesRead()),
+                List.of(cells));
     }
 }

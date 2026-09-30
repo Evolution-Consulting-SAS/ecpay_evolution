@@ -9,8 +9,7 @@ public enum ErrorCode {
     CSV_MAPPING_ERROR("Error al mapear la fila al objeto destino"),
     CSV_TYPE_MISMATCH("El valor no es compatible con el tipo del campo (ej. entero en campo Double)"),
     CSV_ENCODING_INVALID("El contenido del CSV no es texto UTF-8 válido"),
-    CSV_DELIMITER_AMBIGUOUS(
-            "El delimitador es ambiguo: varios candidatos dan el mismo número de columnas");
+    CSV_DELIMITER_AMBIGUOUS("No se pudo determinar el delimitador del encabezado sin ambigüedad");
 
     private final String description;
 
