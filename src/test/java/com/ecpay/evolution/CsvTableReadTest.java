@@ -203,6 +203,37 @@ class CsvTableReadTest {
     }
 
     @Test
+    void readTable_acceptsEscapedQuoteInsideQuotedHeaderCell() {
+        CsvTable semicolon = CsvProcessor.readTable(toBase64("\"a\"\"b\";c\nx;y\n"));
+        CsvTable comma = CsvProcessor.readTable(toBase64("\"a\"\"b\",\"c,d\"\nx,y\n"));
+
+        assertThat(semicolon.delimiter()).isEqualTo(';');
+        assertThat(semicolon.header().cells()).containsExactly("a\"b", "c");
+        assertThat(comma.delimiter()).isEqualTo(',');
+        assertThat(comma.header().cells()).containsExactly("a\"b", "c,d");
+        assertThat(CsvProcessor.readTable(toBase64("\r\n\r\n\"a\"\"b\";c\r\nx;y\r\n")).delimiter())
+                .isEqualTo(';');
+    }
+
+    @Test
+    void readTable_acceptsEscapedQuoteInsideMultilineQuotedHeaderCell() {
+        CsvTable table = CsvProcessor.readTable(toBase64("\n\"co\"\"d\ne\";x\nA;B\n"));
+
+        assertThat(table.delimiter()).isEqualTo(';');
+        assertThat(table.header()).isEqualTo(new CsvRecord(2, 2, 3, List.of("co\"d\ne", "x")));
+    }
+
+    @Test
+    void readTable_stillRejectsLiteralQuoteNextToEscapedQuote() {
+        CsvProcessingException failure = readFailure(toBase64("\"a\"\"b\";c\"d,e\nx;y\n"));
+        CsvProcessingException afterBlankLines =
+                readFailure(toBase64("\r\n\r\n\"a\"\"b\";c\"d,e\r\nx;y\r\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+        assertThat(afterBlankLines.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
     void readTable_reportsFormatErrorWhenHeaderQuoteIsMalformedForEveryDelimiter() {
         CsvProcessingException failure = readFailure(toBase64("\"abierta,b\nx,y\n"));
 
