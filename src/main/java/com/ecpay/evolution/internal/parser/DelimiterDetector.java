@@ -2,7 +2,7 @@ package com.ecpay.evolution.internal.parser;
 
 class DelimiterDetector {
 
-    private static final char[] CANDIDATES = {';', ',', '\t', '|'};
+    static final char[] CANDIDATES = {';', ',', '\t', '|'};
 
     static char detect(String sampleLine) {
         return findMostFrequentCandidate(sampleLine);

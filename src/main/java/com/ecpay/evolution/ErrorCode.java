@@ -7,7 +7,10 @@ public enum ErrorCode {
     CSV_EMPTY_FILE("El archivo CSV está vacío"),
     CSV_TYPE_CONVERSION("Error al convertir el valor al tipo esperado"),
     CSV_MAPPING_ERROR("Error al mapear la fila al objeto destino"),
-    CSV_TYPE_MISMATCH("El valor no es compatible con el tipo del campo (ej. entero en campo Double)");
+    CSV_TYPE_MISMATCH("El valor no es compatible con el tipo del campo (ej. entero en campo Double)"),
+    CSV_ENCODING_INVALID("El contenido del CSV no es texto UTF-8 válido"),
+    CSV_DELIMITER_AMBIGUOUS(
+            "El delimitador es ambiguo: varios candidatos dan el mismo número de columnas");
 
     private final String description;
 
