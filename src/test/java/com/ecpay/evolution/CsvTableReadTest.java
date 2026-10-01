@@ -256,6 +256,9 @@ class CsvTableReadTest {
         assertThat(readFailure("   ").getErrorCode()).isEqualTo(ErrorCode.CSV_EMPTY_FILE);
         assertThat(readFailure(toBase64("\n \r\n\n")).getErrorCode())
                 .isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure(toBase64("\uFEFF")).getErrorCode()).isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure("data:text/csv;base64,").getErrorCode())
+                .isEqualTo(ErrorCode.CSV_EMPTY_FILE);
     }
 
     @Test
@@ -289,6 +292,43 @@ class CsvTableReadTest {
 
         assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
         assertThat(failure.getRow()).isEqualTo(2);
+    }
+
+    @Test
+    void readTable_rejectsQuoteInUnquotedLastFieldInsteadOfJoiningTheNextLine() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion\nADM,Adm\nTV,Pantalla 12\" pulgadas\nVEN,Ventas\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(3);
+    }
+
+    @Test
+    void readTable_rejectsQuoteInUnquotedFieldWhateverItsPosition() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion,hijo\nADM,Adm\nTV,12\" pulgadas,ADM\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(3);
+    }
+
+    @Test
+    void readTable_rejectsTextBeforeCommaThatIsNotABase64DataUrlPrefix() {
+        String csv = toBase64("codigo\nADM\n");
+
+        assertThat(readFailure("texto," + csv).getErrorCode()).isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+        assertThat(readFailure("data:text/csv,QUJD").getErrorCode())
+                .isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+        assertThat(CsvProcessor.readTable("DATA:application/vnd.ms-excel;BASE64," + csv)
+                .header().cells()).containsExactly("codigo");
+    }
+
+    @Test
+    void readTable_rejectsNulCharactersSuchAsUtf16WithoutBom() {
+        String utf16 = Base64.getEncoder().encodeToString(
+                "codigo,descripcion\nADM,Adm\n".getBytes(StandardCharsets.UTF_16LE));
+
+        assertThat(readFailure(utf16).getErrorCode()).isEqualTo(ErrorCode.CSV_ENCODING_INVALID);
     }
 
     @Test

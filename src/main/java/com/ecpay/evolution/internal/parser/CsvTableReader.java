@@ -20,6 +20,9 @@ public class CsvTableReader {
 
     public CsvTable read(String csvText) {
         char delimiter = RecordDelimiterDetector.detect(csvText);
+        RecordQuoteScanner.firstMalformedRecordStartLine(csvText, delimiter).ifPresent(startLine -> {
+            throw new CsvProcessingException(ErrorCode.CSV_FORMAT_INVALID, startLine, null, null, null);
+        });
         try (CSVReader reader = openReader(csvText, delimiter)) {
             CsvRecord header = readHeader(reader).orElseThrow(() ->
                     new CsvProcessingException(ErrorCode.CSV_EMPTY_FILE, 0, null, null, null));
