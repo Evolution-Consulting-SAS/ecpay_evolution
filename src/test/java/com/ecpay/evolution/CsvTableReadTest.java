@@ -339,9 +339,10 @@ class CsvTableReadTest {
     }
 
     @Test
-    void process_keepsLegacyExceptionForInvalidBase64() {
+    void process_wrapsInvalidBase64AsCsvProcessingException() {
         assertThatThrownBy(() -> CsvProcessor.process("@@@", Object.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .isNotInstanceOf(CsvProcessingException.class);
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> assertThat(((CsvProcessingException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.CSV_DECODE_ERROR));
     }
 }

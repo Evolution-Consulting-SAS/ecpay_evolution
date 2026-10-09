@@ -25,14 +25,12 @@ public class Base64CsvDecoder {
             String text = convertBytesToUtf8String(bytes);
             return removeBomIfPresent(text);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Base64 no válido: " + e.getMessage(), e);
+            throw decodeError(e);
         }
     }
 
     public String decodeStrict(String base64Data) {
-        if (base64Data == null || base64Data.isBlank()) {
-            throw new CsvProcessingException(ErrorCode.CSV_EMPTY_FILE, 0, null, null, null);
-        }
+        validateNotEmpty(base64Data);
         return removeBomIfPresent(decodeUtf8Strictly(decodeBase64Strictly(base64Data)));
     }
 
@@ -40,8 +38,7 @@ public class Base64CsvDecoder {
         try {
             return decodeBase64ToBytes(extractBase64PayloadStrictly(base64Data));
         } catch (IllegalArgumentException e) {
-            throw (CsvProcessingException) new CsvProcessingException(
-                    ErrorCode.CSV_DECODE_ERROR, 0, null, null, null).initCause(e);
+            throw decodeError(e);
         }
     }
 
@@ -65,19 +62,32 @@ public class Base64CsvDecoder {
                     .decode(ByteBuffer.wrap(bytes))
                     .toString();
         } catch (CharacterCodingException e) {
-            throw (CsvProcessingException) new CsvProcessingException(
-                    ErrorCode.CSV_ENCODING_INVALID, 0, null, null, null).initCause(e);
+            throw encodingInvalid(e);
         }
         if (text.indexOf(NUL) >= 0) {
-            throw new CsvProcessingException(ErrorCode.CSV_ENCODING_INVALID, 0, null, null, null);
+            throw encodingInvalid(null);
         }
         return text;
     }
 
     private void validateNotEmpty(String base64Data) {
         if (base64Data == null || base64Data.isBlank()) {
-            throw new IllegalArgumentException("El dato Base64 está vacío");
+            throw emptyFile();
         }
+    }
+
+    private static CsvProcessingException emptyFile() {
+        return new CsvProcessingException(ErrorCode.CSV_EMPTY_FILE, 0, null, null, null);
+    }
+
+    private static CsvProcessingException decodeError(Throwable cause) {
+        return (CsvProcessingException) new CsvProcessingException(
+                ErrorCode.CSV_DECODE_ERROR, 0, null, null, null).initCause(cause);
+    }
+
+    private static CsvProcessingException encodingInvalid(Throwable cause) {
+        return (CsvProcessingException) new CsvProcessingException(
+                ErrorCode.CSV_ENCODING_INVALID, 0, null, null, null).initCause(cause);
     }
 
     private String extractBase64Payload(String base64Data) {
