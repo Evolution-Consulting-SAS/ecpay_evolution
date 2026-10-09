@@ -271,17 +271,22 @@ class CsvProcessorIntegrationTest {
     }
 
     @Test
-    void process_invalidBase64_throwsIllegalArgument() {
+    void process_invalidBase64_throwsCsvDecodeError() {
         String entrada = "esto-no-es-base64!!!";
 
-        System.out.println("[TEST] process_invalidBase64_throwsIllegalArgument");
+        System.out.println("[TEST] process_invalidBase64_throwsCsvDecodeError");
         System.out.println("[INPUT] String no-base64: '" + entrada + "'");
 
         assertThatThrownBy(() -> CsvProcessor.process(entrada, HistoricalOrgRow.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .satisfies(ex -> System.out.println("[OUTPUT] Excepción: " + ex.getMessage()));
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> {
+                    CsvProcessingException e = (CsvProcessingException) ex;
+                    System.out.println("[OUTPUT] Excepción: " + e.getMessage());
+                    System.out.println("         ErrorCode: " + e.getErrorCode());
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+                });
 
-        System.out.println("[OK] IllegalArgumentException lanzada correctamente\n");
+        System.out.println("[OK] CsvProcessingException con CSV_DECODE_ERROR lanzada correctamente\n");
     }
 
     // -------------------------------------------------------------------------

@@ -1,0 +1,348 @@
+package com.ecpay.evolution;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class CsvTableReadTest {
+
+    private static String toBase64(String csv) {
+        return Base64.getEncoder().encodeToString(csv.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static CsvProcessingException readFailure(String base64) {
+        try {
+            CsvProcessor.readTable(base64);
+        } catch (CsvProcessingException e) {
+            return e;
+        }
+        throw new AssertionError("Expected CsvProcessingException");
+    }
+
+    @Test
+    void readTable_keepsBlankDataRecordAtItsPhysicalLineForLf() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,descripcion,hijo\nADM,Administración,\n\nVEN,Ventas,ADM\n"));
+
+        assertThat(table.delimiter()).isEqualTo(',');
+        assertThat(table.header()).isEqualTo(
+                new CsvRecord(1, 1, 1, List.of("codigo", "descripcion", "hijo")));
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM", "Administración", "")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("VEN", "Ventas", "ADM")));
+    }
+
+    @Test
+    void readTable_keepsBlankDataRecordAtItsPhysicalLineForCrlf() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,descripcion\r\nADM,Administración\r\n\r\nVEN,Ventas\r\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM", "Administración")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("VEN", "Ventas")));
+    }
+
+    @Test
+    void readTable_keepsBlankAndWhitespaceValuesOfOneColumnFileForLf() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\nADM\n\n   \nVEN\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("   ")),
+                new CsvRecord(5, 5, 5, List.of("VEN")));
+    }
+
+    @Test
+    void readTable_keepsBlankValueOfOneColumnFileForCrlf() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\r\nADM\r\n\r\nVEN\r\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")),
+                new CsvRecord(4, 4, 4, List.of("VEN")));
+    }
+
+    @Test
+    void readTable_treatsFinalLineBreakAsTerminatorButKeepsTrailingBlankLine() {
+        CsvTable terminated = CsvProcessor.readTable(toBase64("codigo\nADM\n"));
+        CsvTable trailingBlank = CsvProcessor.readTable(toBase64("codigo\nADM\n\n"));
+
+        assertThat(terminated.records()).containsExactly(new CsvRecord(2, 2, 2, List.of("ADM")));
+        assertThat(trailingBlank.records()).containsExactly(
+                new CsvRecord(2, 2, 2, List.of("ADM")),
+                new CsvRecord(3, 3, 3, List.of("")));
+    }
+
+    @Test
+    void readTable_skipsBlankLinesBeforeHeaderAndStillCountsThemAsRecordsAndLines() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "\n  \r\n2024-01-01,100\n2024-02-01,200\n"));
+
+        assertThat(table.header()).isEqualTo(new CsvRecord(3, 3, 3, List.of("2024-01-01", "100")));
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(4, 4, 4, List.of("2024-02-01", "200")));
+    }
+
+    @Test
+    void readTable_keepsQuotedLineBreakInsideOneRecordSpanningPhysicalLines() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,descripcion\nADM,\"Administración\ny finanzas\"\n\nVEN,Ventas\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 3, List.of("ADM", "Administración\ny finanzas")),
+                new CsvRecord(3, 4, 4, List.of("")),
+                new CsvRecord(4, 5, 5, List.of("VEN", "Ventas")));
+    }
+
+    @Test
+    void readTable_deliversQuotedCrlfLineBreakAsLf() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,descripcion\r\nADM,\"Administración\r\ny finanzas\"\r\n"));
+
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 2, 3, List.of("ADM", "Administración\ny finanzas")));
+    }
+
+    @Test
+    void readTable_keepsDuplicateAndBlankHeaderNamesAndIrregularWidths() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,,codigo\nADM\nVEN,Ventas,ADM,EXTRA\n,,\n"));
+
+        assertThat(table.header().cells()).containsExactly("codigo", "", "codigo");
+        assertThat(table.records()).extracting(CsvRecord::cells).containsExactly(
+                List.of("ADM"),
+                List.of("VEN", "Ventas", "ADM", "EXTRA"),
+                List.of("", "", ""));
+    }
+
+    @Test
+    void readTable_returnsParsedTextWithoutTrimmingOrNormalizingQuotes() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "codigo,descripcion\n  ADM  ,'Admón'\nVEN,“Ventas”\n\"O\"\"Brien\",C:\\ruta\n"));
+
+        assertThat(table.records()).extracting(CsvRecord::cells).containsExactly(
+                List.of("  ADM  ", "'Admón'"),
+                List.of("VEN", "“Ventas”"),
+                List.of("O\"Brien", "C:\\ruta"));
+    }
+
+    @Test
+    void readTable_returnsHeaderOnlyFileWithoutRecords() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo,descripcion\n"));
+
+        assertThat(table.header().cells()).containsExactly("codigo", "descripcion");
+        assertThat(table.records()).isEmpty();
+    }
+
+    @Test
+    void readTable_detectsEachSupportedDelimiter() {
+        for (char delimiter : new char[]{';', ',', '\t', '|'}) {
+            String separator = String.valueOf(delimiter);
+            CsvTable table = CsvProcessor.readTable(toBase64(
+                    String.join(separator, "codigo", "descripcion") + "\n"
+                            + String.join(separator, "ADM", "Administración") + "\n"));
+
+            assertThat(table.delimiter()).isEqualTo(delimiter);
+            assertThat(table.header().cells()).containsExactly("codigo", "descripcion");
+            assertThat(table.records().get(0).cells()).containsExactly("ADM", "Administración");
+        }
+    }
+
+    @Test
+    void readTable_ignoresCandidateDelimitersInsideQuotedHeaderCells() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "\"Apellido, Nombre\";\"tipo|clase\";documento\n\"Pérez, Ana\";A;123\n"));
+
+        assertThat(table.delimiter()).isEqualTo(';');
+        assertThat(table.header().cells())
+                .containsExactly("Apellido, Nombre", "tipo|clase", "documento");
+        assertThat(table.records().get(0).cells()).containsExactly("Pérez, Ana", "A", "123");
+    }
+
+    @Test
+    void readTable_detectsDelimiterOfMultilineQuotedHeader() {
+        CsvTable table = CsvProcessor.readTable(toBase64(
+                "\"codigo\nlargo\";descripcion\nADM;Administración\n"));
+
+        assertThat(table.delimiter()).isEqualTo(';');
+        assertThat(table.header()).isEqualTo(
+                new CsvRecord(1, 1, 2, List.of("codigo\nlargo", "descripcion")));
+        assertThat(table.records()).containsExactly(
+                new CsvRecord(2, 3, 3, List.of("ADM", "Administración")));
+    }
+
+    @Test
+    void readTable_usesCommaForSingleColumnFile() {
+        CsvTable table = CsvProcessor.readTable(toBase64("codigo\nADM\n\"A,B\"\n"));
+
+        assertThat(table.delimiter()).isEqualTo(',');
+        assertThat(table.records()).extracting(CsvRecord::cells)
+                .containsExactly(List.of("ADM"), List.of("A,B"));
+    }
+
+    @Test
+    void readTable_rejectsHeaderWhereTwoDelimitersGiveTheSameWidth() {
+        CsvProcessingException failure = readFailure(toBase64("a;b,c;d,e\n1;2,3;4,5\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
+    void readTable_doesNotLetAnotherDelimiterWinWhenMalformedHeaderQuoteBecomesLiteral() {
+        CsvProcessingException failure = readFailure(toBase64("a,\"b;c\n1,2\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
+    void readTable_acceptsEscapedQuoteInsideQuotedHeaderCell() {
+        CsvTable semicolon = CsvProcessor.readTable(toBase64("\"a\"\"b\";c\nx;y\n"));
+        CsvTable comma = CsvProcessor.readTable(toBase64("\"a\"\"b\",\"c,d\"\nx,y\n"));
+
+        assertThat(semicolon.delimiter()).isEqualTo(';');
+        assertThat(semicolon.header().cells()).containsExactly("a\"b", "c");
+        assertThat(comma.delimiter()).isEqualTo(',');
+        assertThat(comma.header().cells()).containsExactly("a\"b", "c,d");
+        assertThat(CsvProcessor.readTable(toBase64("\r\n\r\n\"a\"\"b\";c\r\nx;y\r\n")).delimiter())
+                .isEqualTo(';');
+    }
+
+    @Test
+    void readTable_acceptsEscapedQuoteInsideMultilineQuotedHeaderCell() {
+        CsvTable table = CsvProcessor.readTable(toBase64("\n\"co\"\"d\ne\";x\nA;B\n"));
+
+        assertThat(table.delimiter()).isEqualTo(';');
+        assertThat(table.header()).isEqualTo(new CsvRecord(2, 2, 3, List.of("co\"d\ne", "x")));
+    }
+
+    @Test
+    void readTable_stillRejectsLiteralQuoteNextToEscapedQuote() {
+        CsvProcessingException failure = readFailure(toBase64("\"a\"\"b\";c\"d,e\nx;y\n"));
+        CsvProcessingException afterBlankLines =
+                readFailure(toBase64("\r\n\r\n\"a\"\"b\";c\"d,e\r\nx;y\r\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+        assertThat(afterBlankLines.getErrorCode()).isEqualTo(ErrorCode.CSV_DELIMITER_AMBIGUOUS);
+    }
+
+    @Test
+    void readTable_reportsFormatErrorWhenHeaderQuoteIsMalformedForEveryDelimiter() {
+        CsvProcessingException failure = readFailure(toBase64("\"abierta,b\nx,y\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(1);
+    }
+
+    @Test
+    void readTable_acceptsDataUrlPrefixAndRemovesBom() {
+        String base64 = "data:text/csv;base64," + toBase64("\uFEFFcodigo,descripcion\nADM,Adm\n");
+
+        CsvTable table = CsvProcessor.readTable(base64);
+
+        assertThat(table.header().cells()).containsExactly("codigo", "descripcion");
+    }
+
+    @Test
+    void readTable_rejectsNullBlankOrContentlessInputAsEmptyFile() {
+        assertThat(readFailure(null).getErrorCode()).isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure("   ").getErrorCode()).isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure(toBase64("\n \r\n\n")).getErrorCode())
+                .isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure(toBase64("\uFEFF")).getErrorCode()).isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+        assertThat(readFailure("data:text/csv;base64,").getErrorCode())
+                .isEqualTo(ErrorCode.CSV_EMPTY_FILE);
+    }
+
+    @Test
+    void readTable_rejectsInvalidBase64AsDecodeError() {
+        assertThat(readFailure("@@@no-es-base64@@@").getErrorCode())
+                .isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+        assertThat(readFailure("YSxi\nYw==").getErrorCode()).isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+    }
+
+    @Test
+    void readTable_rejectsBytesThatAreNotUtf8InsteadOfReplacingThem() {
+        String latin1 = Base64.getEncoder().encodeToString(
+                "codigo,descripcion\nADM,Administración\n".getBytes(StandardCharsets.ISO_8859_1));
+
+        assertThat(readFailure(latin1).getErrorCode()).isEqualTo(ErrorCode.CSV_ENCODING_INVALID);
+    }
+
+    @Test
+    void readTable_reportsStartLineOfUnterminatedQuotedRecord() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion\nADM,Adm\n\nVEN,\"abierta\nNOM,Nómina\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(4);
+    }
+
+    @Test
+    void readTable_rejectsTextAfterClosingQuote() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion\n\"AD\"M,Adm\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(2);
+    }
+
+    @Test
+    void readTable_rejectsQuoteInUnquotedLastFieldInsteadOfJoiningTheNextLine() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion\nADM,Adm\nTV,Pantalla 12\" pulgadas\nVEN,Ventas\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(3);
+    }
+
+    @Test
+    void readTable_rejectsQuoteInUnquotedFieldWhateverItsPosition() {
+        CsvProcessingException failure = readFailure(toBase64(
+                "codigo,descripcion,hijo\nADM,Adm\nTV,12\" pulgadas,ADM\n"));
+
+        assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.CSV_FORMAT_INVALID);
+        assertThat(failure.getRow()).isEqualTo(3);
+    }
+
+    @Test
+    void readTable_rejectsTextBeforeCommaThatIsNotABase64DataUrlPrefix() {
+        String csv = toBase64("codigo\nADM\n");
+
+        assertThat(readFailure("texto," + csv).getErrorCode()).isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+        assertThat(readFailure("data:text/csv,QUJD").getErrorCode())
+                .isEqualTo(ErrorCode.CSV_DECODE_ERROR);
+        assertThat(CsvProcessor.readTable("DATA:application/vnd.ms-excel;BASE64," + csv)
+                .header().cells()).containsExactly("codigo");
+    }
+
+    @Test
+    void readTable_rejectsNulCharactersSuchAsUtf16WithoutBom() {
+        String utf16 = Base64.getEncoder().encodeToString(
+                "codigo,descripcion\nADM,Adm\n".getBytes(StandardCharsets.UTF_16LE));
+
+        assertThat(readFailure(utf16).getErrorCode()).isEqualTo(ErrorCode.CSV_ENCODING_INVALID);
+    }
+
+    @Test
+    void everyErrorCodeHasAnErrorReason() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertThat(ErrorReason.fromErrorCode(code).getErrorCode()).isEqualTo(code);
+        }
+    }
+
+    @Test
+    void process_wrapsInvalidBase64AsCsvProcessingException() {
+        assertThatThrownBy(() -> CsvProcessor.process("@@@", Object.class))
+                .isInstanceOf(CsvProcessingException.class)
+                .satisfies(ex -> assertThat(((CsvProcessingException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.CSV_DECODE_ERROR));
+    }
+}

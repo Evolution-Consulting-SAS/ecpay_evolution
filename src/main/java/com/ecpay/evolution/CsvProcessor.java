@@ -13,4 +13,8 @@ public final class CsvProcessor {
     public static <T> List<T> process(String base64Csv, Class<T> targetClass) {
         return INSTANCE.process(base64Csv, targetClass);
     }
+
+    public static CsvTable readTable(String base64Csv) {
+        return INSTANCE.readTable(base64Csv);
+    }
 }

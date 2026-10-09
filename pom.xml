@@ -10,11 +10,37 @@
     <packaging>jar</packaging>
     <name>ecpay-evolution</name>
     <description>Librería genérica para procesamiento de CSV en base64 hacia objetos tipados</description>
+    <url>https://github.com/Evolution-Consulting-SAS/ecpay_evolution</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Evolution Consulting SAS</name>
+            <organization>Evolution Consulting SAS</organization>
+            <organizationUrl>https://github.com/Evolution-Consulting-SAS</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/Evolution-Consulting-SAS/ecpay_evolution.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/Evolution-Consulting-SAS/ecpay_evolution.git</developerConnection>
+        <url>https://github.com/Evolution-Consulting-SAS/ecpay_evolution</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-boot.version>3.4.0</spring-boot.version>
     </properties>
 
@@ -83,6 +109,33 @@
                         <goals><goal>jar-no-fork</goal></goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.3</version>
+                <configuration>
+                    <doclint>none</doclint>
+                    <quiet>true</quiet>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals><goal>jar</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Automatic-Module-Name>com.ecpay.evolution</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
             </plugin>
         </plugins>
     </build>
